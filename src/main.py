@@ -1,9 +1,3 @@
-from PyQt5.QtWidgets import QApplication
-import sys
+import ciphers.AES as aes
 
-from src.GUI.AppWindow import AppWindow
-
-app = QApplication(sys.argv)
-window = AppWindow()
-window.show()
-app.exec_()
+aes.encrypt_AES()
