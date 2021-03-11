@@ -1,5 +1,6 @@
 from PyQt5.QtCore import QSize, QDir
 from PyQt5.QtWidgets import *
+from PyQt5 import QtWidgets
 from math import floor
 
 
@@ -75,7 +76,7 @@ class AppWindow(QMainWindow):
 
         # Choose Public key file
         self.choose_public_key_button = QPushButton('Choose file', self)
-        self.choose_public_key_button.clicked.connect(self.choosePublicKey)
+        self.choose_public_key_button.clicked.connect(lambda: self.chooseFile(self.public_key))
         self.choose_public_key_button.resize(floor(self.window_width / 3), 32)
         self.choose_public_key_button.move(floor(self.window_width / 3)+self.padding, floor(self.window_height / 10 * 6))
 
@@ -91,21 +92,73 @@ class AppWindow(QMainWindow):
         self.send_key_label.move(floor(self.window_width / 3*2), floor(self.window_height / 10 * 8))
 
     def senderUI(self):
-        self.sender_label = QLabel(self)
-        self.sender_label.setText('Sender')
-        self.sender_label.move(80, 100)
-        self.sender_label.resize(700, 32)
+        # Ip Label
+        self.sender_ip_label = QLabel(self)
+        self.sender_ip_label.setText('Ip')
+        self.sender_ip_label.move(self.padding, floor(self.window_height / 10 * 2) - 32)
+
+        # Ip Line Edit
+        self.sender_ip = QLineEdit(self)
+        self.sender_ip.move(self.padding, floor(self.window_height / 10 * 2))
+        self.sender_ip.resize(floor(self.window_width / 3), 32)
+
+        # File label
+        self.file_label = QLabel(self)
+        self.file_label.setText('File')
+        self.file_label.move(self.padding, floor(self.window_height / 10 * 4) - 32)
+
+        # File Line Edit
+        self.file = QLineEdit(self)
+        self.file.move(self.padding, floor(self.window_height / 10 * 4))
+        self.file.resize(floor(self.window_width / 3), 32)
+
+        # Choose  file
+        self.choose_file_button = QPushButton('Choose file', self)
+        self.choose_file_button.clicked.connect(lambda: self.chooseFile(self.file))
+        self.choose_file_button.resize(floor(self.window_width / 3), 32)
+        self.choose_file_button.move(floor(self.window_width / 3) + self.padding,
+                                           floor(self.window_height / 10 * 4))
+
+        self.ecb = QRadioButton("ECB",self)
+        self.ecb.move(self.padding, floor(self.window_height / 10 * 5))
+
+        self.cbc = QRadioButton("CBC", self)
+        self.cbc.move(self.padding+70, floor(self.window_height / 10 * 5))
+
+        self.cfb = QRadioButton("CFB", self)
+        self.cfb.move(self.padding+70*2, floor(self.window_height / 10 * 5))
+
+        self.ofb = QRadioButton("OFB", self)
+        self.ofb.move(self.padding + 70*3, floor(self.window_height / 10 * 5))
+
+        # Send button
+        self.send_file = QPushButton('Send', self)
+        self.send_file.clicked.connect(self.sendFile)
+        self.send_file.resize(floor(self.window_width / 3), 32)
+        self.send_file.move(floor(self.window_width / 3), floor(self.window_height / 10 * 8))
+
+        # Send Label
+        self.send_file_label = QLabel(self)
+        self.send_file_label.setText('Ok')
+        self.send_file_label.move(floor(self.window_width / 3 * 2), floor(self.window_height / 10 * 8))
+
+        # Progress bar
+        self.progress_bar = QProgressBar(self)
+        self.progress_bar.resize(self.window_width-25*2, 20)
+        self.progress_bar.move(50, floor(self.window_height / 10 * 7))
+
 
     def receiverUI(self):
-        self.receiver_label = QLabel(self)
-        self.receiver_label.setText('Receiver')
-        self.receiver_label.move(80, 100)
-        self.receiver_label.resize(700, 32)
+        self.list_widget = QListWidget(self)
+        item1 = QListWidgetItem("Logs:")
+        self.list_widget.addItem(item1)
+        scroll_bar = QScrollBar(self)
+        self.list_widget.setGeometry(self.padding,self.padding+50, self.window_width-2*self.padding, self.window_height-2*self.padding-100)
+        self.list_widget.setVerticalScrollBar(scroll_bar)
+
 
     def hideAll(self):
         self.keys_ok_label.hide()
-        self.sender_label.hide()
-        self.receiver_label.hide()
         self.generate_keys_button.hide()
         self.keys_ip_label.hide()
         self.keys_ip.hide()
@@ -114,6 +167,19 @@ class AppWindow(QMainWindow):
         self.choose_public_key_button.hide()
         self.send_key_button.hide()
         self.send_key_label.hide()
+        self.sender_ip.hide()
+        self.sender_ip_label.hide()
+        self.file_label.hide()
+        self.file.hide()
+        self.choose_file_button.hide()
+        self.ecb.hide()
+        self.cbc.hide()
+        self.cfb.hide()
+        self.ofb.hide()
+        self.send_file.hide()
+        self.progress_bar.hide()
+        self.send_file_label.hide()
+        self.list_widget.hide()
 
     def clickKeysButton(self):
         self.hideAll()
@@ -128,20 +194,29 @@ class AppWindow(QMainWindow):
         self.choose_public_key_button.show()
         self.send_key_button.show()
 
-
     def clickSenderButton(self):
         self.hideAll()
         self.sender_button.setStyleSheet("background-color : #2C93C7")
         self.keys_button.setStyleSheet("background-color : #21B0F7")
         self.receiver_button.setStyleSheet("background-color : #21B0F7")
-        self.sender_label.show()
+        self.sender_ip.show()
+        self.sender_ip_label.show()
+        self.file_label.show()
+        self.file.show()
+        self.choose_file_button.show()
+        self.ecb.show()
+        self.cbc.show()
+        self.cfb.show()
+        self.ofb.show()
+        self.send_file.show()
+        self.progress_bar.show()
 
     def clickReceiverButton(self):
         self.hideAll()
         self.receiver_button.setStyleSheet("background-color : #2C93C7")
         self.sender_button.setStyleSheet("background-color : #21B0F7")
         self.keys_button.setStyleSheet("background-color : #21B0F7")
-        self.receiver_label.show()
+        self.list_widget.show()
 
     def clickGenerateKeysButton(self):
         ##########################
@@ -150,18 +225,25 @@ class AppWindow(QMainWindow):
         print("wygenerowałem")
         self.keys_ok_label.show()
 
-    def choosePublicKey(self):
+
+    def chooseFile(self, line_edit):
         dialog = QFileDialog()
         dialog.setFileMode(QFileDialog.AnyFile)
         dialog.setFilter(QDir.Files)
-        public_key_path = " "
+
         if dialog.exec_():
-            public_key_path = dialog.selectedFiles()[0]
-        self.public_key.setText(public_key_path)
+            line_edit.setText(dialog.selectedFiles()[0])
 
     def sendKey(self):
         ##########################
         # wyślij_klucz()
         ##########################
         self.send_key_label.show()
+        print("wysłałem")
+
+    def sendFile(self):
+        ##########################
+        # wyślij_plik()
+        ##########################
+        self.send_file_label.show()
         print("wysłałem")
