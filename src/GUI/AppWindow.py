@@ -3,6 +3,8 @@ from PyQt5.QtWidgets import *
 from PyQt5 import QtWidgets
 from math import floor
 
+from src import sender
+
 
 class AppWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
@@ -245,5 +247,6 @@ class AppWindow(QMainWindow):
         ##########################
         # wyślij_plik()
         ##########################
+        sender.send_message()
         self.send_file_label.show()
         print("wysłałem")
