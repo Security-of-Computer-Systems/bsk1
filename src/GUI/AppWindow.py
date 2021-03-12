@@ -3,7 +3,8 @@ from PyQt5.QtWidgets import *
 from PyQt5 import QtWidgets
 from math import floor
 
-from src import sender
+from src import sender, receiver
+from src.receiver import ListenThread
 
 
 class AppWindow(QMainWindow):
@@ -12,10 +13,12 @@ class AppWindow(QMainWindow):
         self.window_width = 600
         self.window_height = 400
         self.padding = 30
+
         self.mainUI()
         self.keysUI()
         self.senderUI()
         self.receiverUI()
+        self.thread = ListenThread()
         self.show()
         self.clickKeysButton()
 
@@ -100,7 +103,7 @@ class AppWindow(QMainWindow):
         self.sender_ip_label.move(self.padding, floor(self.window_height / 10 * 2) - 32)
 
         # Ip Line Edit
-        self.sender_ip = QLineEdit(self)
+        self.sender_ip = QLineEdit("localhost", self)
         self.sender_ip.move(self.padding, floor(self.window_height / 10 * 2))
         self.sender_ip.resize(floor(self.window_width / 3), 32)
 
@@ -151,12 +154,34 @@ class AppWindow(QMainWindow):
 
 
     def receiverUI(self):
-        self.list_widget = QListWidget(self)
+        # Ip Label
+        self.receiver_ip_label = QLabel(self)
+        self.receiver_ip_label.setText('Ip')
+        self.receiver_ip_label.move(self.padding, floor(self.window_height / 10 * 2) - 32)
+
+        # Ip Line Edit
+        self.receiver_ip = QLineEdit("localhost" ,self)
+        self.receiver_ip.move(self.padding, floor(self.window_height / 10 * 2))
+        self.receiver_ip.resize(floor(self.window_width / 3), 32)
+
+        # Listen button
+        self.listen_button = QPushButton('Connect', self)
+        self.listen_button.clicked.connect(self.clickListenButton)
+        self.listen_button.resize(floor(self.window_width / 3), 32)
+        self.listen_button.move(self.padding+floor(self.window_width / 3), floor(self.window_height / 10 * 2))
+
+        # Ok Label
+        self.receiver_ok_label = QLabel(self)
+        self.receiver_ok_label.setText('Ok')
+        self.receiver_ok_label.move(floor(self.window_width / 3)*2 + self.padding, floor(self.window_height / 10 * 2))
+
+        #Logs
+        self.logs = QListWidget(self)
         item1 = QListWidgetItem("Logs:")
-        self.list_widget.addItem(item1)
+        self.logs .addItem(item1)
         scroll_bar = QScrollBar(self)
-        self.list_widget.setGeometry(self.padding,self.padding+50, self.window_width-2*self.padding, self.window_height-2*self.padding-100)
-        self.list_widget.setVerticalScrollBar(scroll_bar)
+        self.logs.setGeometry(self.padding, self.padding+110, self.window_width-2*self.padding, self.window_height-2*self.padding-100)
+        self.logs.setVerticalScrollBar(scroll_bar)
 
 
     def hideAll(self):
@@ -181,7 +206,11 @@ class AppWindow(QMainWindow):
         self.send_file.hide()
         self.progress_bar.hide()
         self.send_file_label.hide()
-        self.list_widget.hide()
+        self.logs.hide()
+        self.receiver_ip_label.hide()
+        self.receiver_ip.hide()
+        self.listen_button.hide()
+        self.receiver_ok_label.hide()
 
     def clickKeysButton(self):
         self.hideAll()
@@ -218,15 +247,10 @@ class AppWindow(QMainWindow):
         self.receiver_button.setStyleSheet("background-color : #2C93C7")
         self.sender_button.setStyleSheet("background-color : #21B0F7")
         self.keys_button.setStyleSheet("background-color : #21B0F7")
-        self.list_widget.show()
-
-    def clickGenerateKeysButton(self):
-        ##########################
-        # wygeneruj_klucze()
-        ##########################
-        print("wygenerowałem")
-        self.keys_ok_label.show()
-
+        self.logs.show()
+        self.receiver_ip_label.show()
+        self.receiver_ip.show()
+        self.listen_button.show()
 
     def chooseFile(self, line_edit):
         dialog = QFileDialog()
@@ -236,17 +260,36 @@ class AppWindow(QMainWindow):
         if dialog.exec_():
             line_edit.setText(dialog.selectedFiles()[0])
 
+    def clickGenerateKeysButton(self):
+        ##########################
+        # wygeneruj_klucze()
+        ##########################
+        print("wygenerowałem")
+        self.keys_ok_label.show()
+
     def sendKey(self):
-        ##########################
-        # wyślij_klucz()
-        ##########################
+        sender.send_key(self.keys_ip.text(), self.public_key.text())
         self.send_key_label.show()
         print("wysłałem")
 
     def sendFile(self):
-        ##########################
-        # wyślij_plik()
-        ##########################
-        sender.send_message()
+
+        if self.ofb.isChecked():
+            mode = "ofb"
+        elif self.cbc.isChecked():
+            mode = "cbc"
+        elif self.cfb.isChecked():
+            mode = "cfb"
+        else:
+            mode = "ecb"
+
+        sender.send_file(self.sender_ip.text(), self.file.text(), mode, self.progress_bar)
         self.send_file_label.show()
         print("wysłałem")
+
+    def clickListenButton(self):
+        #nowy wątek
+        self.thread.setArguments(self.logs, self.receiver_ip.text())
+        self.thread.start()
+
+        self.receiver_ok_label.show()
