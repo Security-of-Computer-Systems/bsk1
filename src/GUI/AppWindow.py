@@ -4,6 +4,7 @@ from PyQt5 import QtWidgets
 from math import floor
 
 from src import sender, receiver
+from src.encryption import create_RSA_keys
 from src.receiver import ListenThread
 
 
@@ -136,6 +137,23 @@ class AppWindow(QMainWindow):
         self.ofb = QRadioButton("OFB", self)
         self.ofb.move(self.padding + 70*3, floor(self.window_height / 10 * 5))
 
+        # Public key label
+        self.public_key_label2 = QLabel(self)
+        self.public_key_label2.setText('Public Key')
+        self.public_key_label2.move(self.padding, floor(self.window_height / 10 * 6) - 32)
+
+        # Public Key Line Edit
+        self.public_key2 = QLineEdit(self)
+        self.public_key2.move(self.padding, floor(self.window_height / 10 * 6))
+        self.public_key2.resize(floor(self.window_width / 3), 32)
+
+        # Choose Public key file
+        self.choose_public_key_button2 = QPushButton('Choose file', self)
+        self.choose_public_key_button2.clicked.connect(lambda: self.chooseFile(self.public_key2))
+        self.choose_public_key_button2.resize(floor(self.window_width / 3), 32)
+        self.choose_public_key_button2.move(floor(self.window_width / 3) + self.padding,
+                                           floor(self.window_height / 10 * 6))
+
         # Send button
         self.send_file = QPushButton('Send', self)
         self.send_file.clicked.connect(self.sendFile)
@@ -192,6 +210,9 @@ class AppWindow(QMainWindow):
         self.public_key_label.hide()
         self.public_key.hide()
         self.choose_public_key_button.hide()
+        self.public_key_label2.hide()
+        self.public_key2.hide()
+        self.choose_public_key_button2.hide()
         self.send_key_button.hide()
         self.send_key_label.hide()
         self.sender_ip.hide()
@@ -241,6 +262,9 @@ class AppWindow(QMainWindow):
         self.ofb.show()
         self.send_file.show()
         self.progress_bar.show()
+        self.public_key_label2.show()
+        self.public_key2.show()
+        self.choose_public_key_button2.show()
 
     def clickReceiverButton(self):
         self.hideAll()
@@ -261,10 +285,8 @@ class AppWindow(QMainWindow):
             line_edit.setText(dialog.selectedFiles()[0])
 
     def clickGenerateKeysButton(self):
-        ##########################
-        # wygeneruj_klucze()
-        ##########################
-        print("wygenerowałem")
+        create_RSA_keys()
+        print("Wygenerowałem klucz publiczny i prywatny")
         self.keys_ok_label.show()
 
     def sendKey(self):
@@ -283,12 +305,11 @@ class AppWindow(QMainWindow):
         else:
             mode = "ecb"
 
-        sender.send_file(self.sender_ip.text(), self.file.text(), mode, self.progress_bar)
+        sender.send_file(self.sender_ip.text(), self.file.text(), mode, self.progress_bar, self.public_key2.text())
         self.send_file_label.show()
         print("wysłałem")
 
     def clickListenButton(self):
-        #nowy wątek
         self.thread.setArguments(self.logs, self.receiver_ip.text())
         self.thread.start()
 

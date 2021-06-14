@@ -3,6 +3,8 @@ import socket
 from PyQt5.QtCore import QThread, QObject
 from PyQt5.QtWidgets import QListWidgetItem
 
+from src.encryption import decrypt_session_key, decrypt
+
 
 class ListenThread(QThread):
 
@@ -16,7 +18,7 @@ class ListenThread(QThread):
         self.ip = ip
 
     def run(self):
-        TCP_PORT = 10000
+        TCP_PORT = 8081
 
         # Create a TCP/IP socket
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -35,13 +37,21 @@ class ListenThread(QThread):
 
             header = conn.recv(self.buffer_size)
 
-            message_type = str(header).split("|")[1]
+            message_type = str(header).split("||")[1]
 
             if message_type == "file":
-                file_name = str(header).split("|")[2]
-                mode = str(header).split("|")[3]
+                file_name = str(header).split("||")[2]
+                mode = str(header).split("||")[3]
+                encrypted_session_key = header.split(b'||')[4]
+                iv = header.split(b'||')[5]
+                vcvfd = len(encrypted_session_key)
 
-                self.download_file(conn, file_name, mode)
+                # decrypt the session key
+                session_key = decrypt_session_key(encrypted_session_key, "D:/Semestr VI/BSK/Projekt/src/user_prv_keys/klucz.txt", "dsvv")
+
+
+
+                self.download_file(conn, file_name, mode, session_key, iv)
 
                 print(str(addr) + "send file: " + file_name)
                 item = QListWidgetItem(str(addr) + "send file: " + file_name)
@@ -54,7 +64,7 @@ class ListenThread(QThread):
 
 
 
-    def download_file(self, conn, file_name, mode):
+    def download_file(self, conn, file_name, mode, session_key, iv):
 
         #session_key = conn.recv(self.buffer_size) ##################################
         with open("Files/"+file_name, "wb") as f:
@@ -69,7 +79,10 @@ class ListenThread(QThread):
                 # conn.send(bytes("wiadomosc dostarczona","utf-8") ) # echo
             conn.close()
 
-        # rozszyfruj_plik(file_name, mode, session_key) #############################################################################
+        # decrypt data
+
+        with open("encrypted_files/" + file_name, "wb") as f:
+            f.write(decrypt("Files/"+file_name, mode, session_key, iv))
 
     def download_key(self, addr, conn):
         with open("Keys/"+str(addr) + ".pub", "wb") as f:

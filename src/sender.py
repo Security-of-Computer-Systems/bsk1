@@ -1,47 +1,42 @@
 import socket
+import sys
 from pathlib import Path
 
+from src.encryption import *
 
-def send_file(ip, file_path, mode, progress_bar):
-    port = 10000
+
+def send_file(ip, file_path, mode, progress_bar, public_key_path):
+    port = 8081
     buffer_size = 512
     file_name = file_path.split("/")[-1]
-    file_size = Path(file_path).stat().st_size # w bajtach przed szyfrowaniem
-    sended_bytes = 0
+    bytes_sent = 0
 
-    if mode == "ecb":
-        print("ecb()")
-    elif mode == "cbc":
-        print("cbc()")
-    elif mode == "cfb":
-        print("cfb()")
-    elif mode == "ofb":
-        print("ofb()")
+    # encryption
+    ct, session_key, iv = encrypt(file_path, mode)
 
-    # Plik znajduje się teraz w folderze tmp
-    # plik ma nowy rozmiar
-    # file_size = Path("tmp/" + file_name).stat().st_size ################################
+    file_size = sys.getsizeof(ct)
+    encrypted_session_key = encrypt_session_key(session_key, public_key_path)
+    # save bytes to file
+    with open("tmp/" + file_name, "wb") as f:
+        f.write(ct)
 
-    message = "|file|" + file_name + "|" + mode
 
-    #session_key = create_session_key()#########################################
+    # message header
+    message = bytes("||file||", "utf-8") + bytes(file_name, "utf-8") + bytes("||", "utf-8") + bytes(mode, "utf-8") + bytes("||", "utf-8") + encrypted_session_key + bytes("||", "utf-8") + iv
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((ip, port))
 
     # send header
-    s.send(bytes(message, "utf-8"))
-
-    # send session key
-    # s.send(session_key)##############################################################
+    s.send(message)
 
     # start sending the file
-    # file_path -> tmp/file_name ############################################################
-    with open(file_path, "rb") as f:
+    with open("tmp/" + file_name, "rb") as f:
         while True:
             # read the bytes from the file
             bytes_read = f.read(buffer_size)
-            sended_bytes += len(bytes_read)
+
+            bytes_sent += len(bytes_read)
 
             if not bytes_read:
                 # file transmitting is done
@@ -49,8 +44,7 @@ def send_file(ip, file_path, mode, progress_bar):
             s.sendall(bytes_read)
 
             # update the progress bar
-            progress_bar.setValue(sended_bytes/file_size*100)
-            print(sended_bytes/file_size*100)
+            progress_bar.setValue(bytes_sent/file_size*100)
 
     s.close()
 
@@ -59,7 +53,7 @@ def send_file(ip, file_path, mode, progress_bar):
 
 
 def send_key(ip, file_path):
-    port = 10000
+    port = 8081
     buffer_size = 512
     file_name = file_path.split("/")[-1]
 
@@ -84,5 +78,4 @@ def send_key(ip, file_path):
             # update the progress bar
 
     s.close()
-
 
