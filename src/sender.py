@@ -1,12 +1,13 @@
 import socket
 import sys
+import time
 from pathlib import Path
 
 from src.encryption import *
 
 
 def send_file(ip, file_path, mode, progress_bar, public_key_path):
-    port = 8081
+    port = 8086
     buffer_size = 512
     file_name = file_path.split("/")[-1]
     bytes_sent = 0
@@ -14,7 +15,7 @@ def send_file(ip, file_path, mode, progress_bar, public_key_path):
     # encryption
     ct, session_key, iv = encrypt(file_path, mode)
 
-    file_size = sys.getsizeof(ct)
+
     encrypted_session_key = encrypt_session_key(session_key, public_key_path)
     # save bytes to file
     with open("tmp/" + file_name, "wb") as f:
@@ -22,7 +23,10 @@ def send_file(ip, file_path, mode, progress_bar, public_key_path):
 
 
     # message header
-    message = bytes("||file||", "utf-8") + bytes(file_name, "utf-8") + bytes("||", "utf-8") + bytes(mode, "utf-8") + bytes("||", "utf-8") + encrypted_session_key + bytes("||", "utf-8") + iv
+    message = bytes("||file||", "utf-8") + bytes(file_name, "utf-8") + bytes("||", "utf-8") + bytes(mode, "utf-8") \
+              + bytes("||", "utf-8") + encrypted_session_key + bytes("||", "utf-8") + iv + bytes("||", "utf-8")
+
+    file_size = len(ct) + len(message)
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((ip, port))
@@ -30,6 +34,7 @@ def send_file(ip, file_path, mode, progress_bar, public_key_path):
     # send header
     s.send(message)
 
+    bytes_sent = len(message)
     # start sending the file
     with open("tmp/" + file_name, "rb") as f:
         while True:
@@ -38,13 +43,17 @@ def send_file(ip, file_path, mode, progress_bar, public_key_path):
 
             bytes_sent += len(bytes_read)
 
+            # update the progress bar
+            progress_bar.setValue(bytes_sent / file_size * 100)
+
+
             if not bytes_read:
                 # file transmitting is done
                 break
             s.sendall(bytes_read)
 
-            # update the progress bar
-            progress_bar.setValue(bytes_sent/file_size*100)
+
+
 
     s.close()
 
@@ -53,11 +62,11 @@ def send_file(ip, file_path, mode, progress_bar, public_key_path):
 
 
 def send_key(ip, file_path):
-    port = 8081
+    port = 8086
     buffer_size = 512
     file_name = file_path.split("/")[-1]
 
-    message = "|key|"
+    message = "||key||"
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.connect((ip, port))

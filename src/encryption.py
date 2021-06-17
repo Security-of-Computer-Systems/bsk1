@@ -8,11 +8,75 @@ from cryptography.hazmat.primitives.asymmetric import padding as aspadding
 
 # pseudolosowy ciąg przy złym haśle
 # pseudolosowy ciąg przy złym kluczu
-# zachowanie rozszerzenia -> to chyba i tak u patryka
-# inne szyfrowanie klucza prywatnego? opinia patryka?
+
+# własne szyfrowanie i odszyfrowanie tego klucza prywatnego
+# tamta losowość
+# duże pliki?
+
+# funkcja generująca hash przy użyciu SHA256
+def hash(data):
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(data.encode())
+    hashed = digest.finalize()
+    return hashed
 
 
-# inicjalizacja folderów
+# funkcja szyfrująca klucz prywatny przy użyciu AESa w trybie CBC z encryption key = hash hasła użytkownika
+def encrypt_RSA_key(private_key,password):
+    # generowanie wektora inicjalizującego
+    iv = os.urandom(16)
+
+    # generowania hasha hasła użytkownika
+    hashed_password = hash(password)
+
+    # dodawanie paddingu do klucza prywatnego
+    padder = padding.PKCS7(128).padder()
+    padded_key = padder.update(private_key)
+    padded_key += padder.finalize()
+
+    # szyfrowanie klucza prywatnego
+    cipher = Cipher(algorithms.AES(hashed_password), modes.CBC(iv))
+    encryptor = cipher.encryptor()
+    encrypted_private_key = encryptor.update(padded_key) + encryptor.finalize()
+
+    return encrypted_private_key, iv
+
+
+# funkcja odszyfrowująca klucz prywatny
+def decrypt_RSA_key(file_path, password):
+    # otwarcie pliku z kluczem prywatnym
+    privkey_file = open(file_path, "rb")
+
+    # wczytanie wektora inicjalizującego
+    iv = privkey_file.read(16)
+
+    # wczytanie zaszyfrowanego klucza prywatnego
+    private_key_encrypted = privkey_file.read()
+
+    # zamknięcie pliku z kluczem prywatnym
+    privkey_file.close()
+
+    # generowanie hasha z podanego przez użytkownika hasła do klucza
+    hashed_password = hash(password)
+
+    # deszyfrowanie
+    cipher = Cipher(algorithms.AES(hashed_password), modes.CBC(iv))
+    decryptor = cipher.decryptor()
+    decrypted = decryptor.update(private_key_encrypted) + decryptor.finalize()
+
+    # usuwanie paddingu
+    unpadder = padding.PKCS7(128).unpadder()
+    unpadded_data = unpadder.update(decrypted)
+    unpadded_data += unpadder.finalize()
+
+    # wczytanie klucza do formy obsługiwanej przez bibliotekę
+    private_key = serialization.load_pem_private_key(
+        unpadded_data,
+        password=None)
+
+    return private_key
+
+# inicjalizacja folderów do przechowywania kluczy
 def directories_initialization():
 
     # folder na własne klucze publiczne
@@ -34,7 +98,8 @@ def directories_initialization():
         os.mkdir("other_keys")
 
 
-def create_RSA_keys():
+# funkcja tworząca pare kluczy RSA
+def create_RSA_keys(password):
 
     #tworzenie folderów
     directories_initialization()
@@ -47,8 +112,12 @@ def create_RSA_keys():
     # serializacja klucza prywatnego
     pem_prv = private_key.private_bytes(
     encoding = serialization.Encoding.PEM,
-    format = serialization.PrivateFormat.PKCS8,
-    encryption_algorithm = serialization.BestAvailableEncryption(b'mypassword')) #problem? nie wiem czym ten klucz jest szyforwany
+    format = serialization.PrivateFormat.TraditionalOpenSSL,
+    encryption_algorithm = serialization.NoEncryption())
+
+    #szyfrowanie klucza prywatnego
+    private_key_ciphered, iv = encrypt_RSA_key(pem_prv,password)
+    pem_prv = iv + private_key_ciphered
 
     # tworzenie klucza publicznego
     public_key = private_key.public_key()
@@ -59,16 +128,17 @@ def create_RSA_keys():
     format = serialization.PublicFormat.SubjectPublicKeyInfo)
 
     # zapisanie klucza prywatnego do folderu
-    privkey_file = open("user_prv_keys/klucz.txt", "wb") #problem? rozszerzenie nic nie zmienia ale może "wyglądać lepiej"
+    privkey_file = open("user_prv_keys/klucz.pem", "wb")
     privkey_file.write(pem_prv)
     privkey_file.close()
 
     # zapisanie klucza publicznego do folderu
-    pubkey_file = open("user_pub_keys/klucz_pub.txt", "wb")
+    pubkey_file = open("user_pub_keys/klucz.pub", "wb")
     pubkey_file.write(pem_pub)
     pubkey_file.close()
 
 
+# funkcja szyfrująca klucz sesyjny
 def encrypt_session_key(session_key, public_key_path):
     #wczytanie klucza publicznego
     pubkey = open(public_key_path, "rb")
@@ -86,15 +156,12 @@ def encrypt_session_key(session_key, public_key_path):
 
     return ciphered_skey
 
-# przyjmuje klucz sesyjne, ścieżkę doi klucza prywatnego i hasło klucza prywatnego
+
+# funkcja odszyfrowująca klucz sesyjny
 def decrypt_session_key(session_key, private_key_path, password):
     # wczytanie klucza prywatnego
-    privkey_file = open(private_key_path, "rb")
-    private_key = serialization.load_pem_private_key(
-        privkey_file.read(),
-        password=b'mypassword')
-    privkey_file.close()
-
+    private_key = decrypt_RSA_key(private_key_path,password)
+    a = len(session_key)
     # odszyfrowanie klucza sesyjnego
     decrypted_skey = private_key.decrypt(
     session_key,
@@ -102,10 +169,11 @@ def decrypt_session_key(session_key, private_key_path, password):
         mgf = aspadding.MGF1(algorithm=hashes.SHA256()),
         algorithm = hashes.SHA256(),
         label = None))
+
     return decrypted_skey
 
 
-# data_path = ścieżka do pliku, encryption_mode = tryb blokowy w formie stringa np. "ECB" lub "OFB"
+# data_path = ścieżka do pliku, encryption_mode = tryb blokowy w formie stringa np. "ecb" lub "ofb"
 # zwraca 0 jak podano zły tryb
 def encrypt(data_path, encryption_mode):
 
@@ -146,10 +214,10 @@ def encrypt(data_path, encryption_mode):
     return ct, key, iv
 
 
-# data_path = ścieżka do pliku, encryption_mode = tryb blokowy w formie stringa np. "ECB" lub "OFB"
+# data_path = ścieżka do pliku, encryption_mode = tryb blokowy w formie stringa np. "ecb" lub "ofb"
 # session_key = klucz sesyjny, iv = wektor inicjalizacyjny
 # zwraca 0 jak podano zły tryb
-def decrypt(data_path, encryption_mode, session_key, iv):
+def decrypt(data_path, encryption_mode, private_key_path, private_key_password,  encrypted_session_key, iv):
     # wczytanie pliku do odszyfrowania ze ścieżki
     file = open(data_path, 'rb')
     data = file.read()
@@ -167,6 +235,9 @@ def decrypt(data_path, encryption_mode, session_key, iv):
     else:
         return 0
 
+    # deszyfrowanie klucza sesyjnego
+    session_key = decrypt_session_key(encrypted_session_key,private_key_path,private_key_password)
+
     # deszyfrowanie
     cipher = Cipher(algorithms.AES(session_key), mode)
     decryptor = cipher.decryptor()
@@ -178,5 +249,3 @@ def decrypt(data_path, encryption_mode, session_key, iv):
     unpadded_data += unpadder.finalize()
 
     return unpadded_data
-
-
